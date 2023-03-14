@@ -19,6 +19,7 @@ android {
         targetSdk 32
         versionCode 1
         versionName "1.0"
+        archivesBaseName = "battery_monitor"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }

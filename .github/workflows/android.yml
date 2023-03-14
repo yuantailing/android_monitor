@@ -27,4 +27,10 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: battery_monitor
-        path: app/build/outputs/apk/release/app-release.apk
+        path: app/build/outputs/apk/release/battery_monitor-release.apk
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: app/build/outputs/apk/release/battery_monitor-release.apk
