@@ -30,6 +30,7 @@ public class MainActivity extends AppCompatActivity {
     private int mVoltage = 0;
     private String mainText;
     private final ArrayList<Double> history = new ArrayList<Double>();
+    private int mHistoryOffset = 0;
     private boolean isAppInForeground = true;
 
     @Override
@@ -40,6 +41,7 @@ public class MainActivity extends AppCompatActivity {
         final TextView textView = (TextView)findViewById(R.id.mainText);
         final SeekBar seekBar = (SeekBar)findViewById(R.id.seekBar);
         final TextView seekBarText = (TextView)findViewById(R.id.seekBarText);
+        final SeekBar seekBarHistory = (SeekBar)findViewById(R.id.seekBarHistory);
         final LineChart chart = (LineChart)findViewById(R.id.lineChart);
         chart.getDescription().setText("");
         final Locale locale = Locale.getDefault();
@@ -56,20 +58,25 @@ public class MainActivity extends AppCompatActivity {
                 textView.setText(mainText);
                 LineDataSet dataSet = new LineDataSet(new ArrayList<Entry>(), "Power (Watt)");
                 int drawLimit = (int)Math.round(Math.pow(10, 1.5 + (double)seekBar.getProgress() * .001)) + 1;
-                String s = "Draw " + (drawLimit - 1) + " entries";
+                String s = "Width " + (drawLimit - 1);
                 seekBarText.setText(s);
                 float minP = 0;
                 float maxP = 0;
-                int x0 = Math.max(0, history.size() - drawLimit);
-                for (int i = x0; i < history.size(); i++) {
+                int history_dropout = Math.max(0, (int)Math.round((history.size() - drawLimit) * (1 - seekBarHistory.getProgress() / 1000.)));
+                int x0 = Math.max(0, history.size() - history_dropout - drawLimit);
+                for (int i = x0; i < history.size() - history_dropout; i++) {
                     float P = history.get(i).floatValue();
                     minP = Math.min(minP, P);
                     maxP = Math.max(maxP, P);
-                    dataSet.addEntry(new Entry(i - x0, P));
+                    dataSet.addEntry(new Entry(i + mHistoryOffset, P));
                 }
+                dataSet.setDrawValues(drawLimit <= 100);
+                dataSet.setDrawCircles(drawLimit <= 500);
                 LineData lineData = new LineData(dataSet);
                 chart.setData(lineData);
-                chart.setVisibleXRange(0, drawLimit - .99f);
+                chart.getXAxis().setAxisMinimum(history.size() + mHistoryOffset - history_dropout - drawLimit);
+                chart.getXAxis().setAxisMaximum(history.size() + mHistoryOffset - history_dropout - 1);
+                chart.setScaleXEnabled(false);
                 chart.getAxisLeft().setAxisMinimum((float)Math.floor((double)minP) * 1.05f);
                 chart.getAxisLeft().setAxisMaximum((float)Math.ceil((double)maxP) * 1.05f);
                 chart.getAxisRight().setAxisMinimum((float)Math.floor((double)minP) * 1.05f);
@@ -99,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onActivityDestroyed(Activity activity) { }
         });
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        SeekBar.OnSeekBarChangeListener seekBawrListener = new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) { }
             @Override
@@ -108,7 +115,9 @@ public class MainActivity extends AppCompatActivity {
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 mainExecutor.execute(updateView);
             }
-        });
+        };
+        seekBar.setOnSeekBarChangeListener(seekBawrListener);
+        seekBarHistory.setOnSeekBarChangeListener(seekBawrListener);
         class UpdateTask extends TimerTask {
             @Override
             public void run() {
@@ -128,9 +137,13 @@ public class MainActivity extends AppCompatActivity {
                 }
                 s += "EXTRA_VOLTAGE\n" + mVoltage;
                 mainText = s;
-                if (history.size() >= 10001)
-                    history.remove(0);
-                history.add(P);
+                if (mVoltage != 0) {
+                    if (history.size() >= 1100000) {
+                        history.subList(0, 100000).clear();
+                        mHistoryOffset += 100000;
+                    }
+                    history.add(P);
+                }
                 if (isAppInForeground)
                     mainExecutor.execute(updateView);
             }
